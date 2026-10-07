@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=TV Atlas
+GenericName=Global Television Explorer
+Comment=Explore and stream live broadcast television networks on an interactive 3D globe
+Exec=tv-atlas %u
+Icon=tv-atlas
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;Network;
+Keywords=tv;television;globe;stream;broadcast;atlas;video;media;
+StartupNotify=true
+StartupWMClass=TV-Atlas

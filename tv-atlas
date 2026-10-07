@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve symlinks to find true project or installation directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+
+# Fallback to user app directory if standalone
+if [ ! -f "${SCRIPT_DIR}/main.py" ] && [ -d "$HOME/.local/share/tv-atlas-app" ]; then
+  SCRIPT_DIR="$HOME/.local/share/tv-atlas-app"
+fi
+
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+export DISPLAY="${DISPLAY:-:0}"
+export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
+
+exec python3 "${SCRIPT_DIR}/main.py" "$@"
