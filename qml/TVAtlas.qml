@@ -1067,7 +1067,7 @@ Rectangle {
     anchors.right: parent.right
     height: 48
     color: "#05070ae6"
-    visible: backend.isFullscreen
+    visible: backend ? backend.isFullscreen : false
     z: 100
 
     // Bottom hairline accent
@@ -1100,9 +1100,11 @@ Rectangle {
 
       // Station name & metadata
       Text {
-        text: (backend.currentChannel.name || "TV Atlas Cinema") + "  ·  " +
-              (backend.currentChannel.countryName || backend.currentChannel.country || "Live") + "  ·  " +
-              (backend.currentChannel.quality || "HD")
+        text: backend && backend.currentChannel ? (
+                (backend.currentChannel.name || "TV Atlas Cinema") + "  ·  " +
+                (backend.currentChannel.countryName || backend.currentChannel.country || "Live") + "  ·  " +
+                (backend.currentChannel.quality || "HD")
+              ) : "TV Atlas Cinema"
         color: "#f3f4f5"
         font.pixelSize: 14
         font.bold: true
@@ -1124,12 +1126,12 @@ Rectangle {
           MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: backend.previousStation()
+            onClicked: if (backend) backend.previousStation()
           }
         }
 
         Text {
-          text: backend.isPlaying && !backend.isPaused ? "⏸" : "▶"
+          text: backend && backend.isPlaying && !backend.isPaused ? "⏸" : "▶"
           color: "#00e5ff"
           font.pixelSize: 16
           font.bold: true

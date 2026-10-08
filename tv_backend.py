@@ -133,7 +133,11 @@ class MPVController:
                 self.proc.terminate()
                 self.proc.wait(timeout=0.4)
             except Exception:
-                pass
+                try:
+                    self.proc.kill()
+                    self.proc.wait(timeout=0.2)
+                except Exception:
+                    pass
             self.proc = None
         if os.path.exists(self.sock_path):
             try:
