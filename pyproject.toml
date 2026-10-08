@@ -27,5 +27,5 @@ dependencies = [
 tv-atlas = "main:main"
 
 [project.urls]
-Homepage = "https://github.com/TV-Atlas/TV-Atlas"
-Repository = "https://github.com/TV-Atlas/TV-Atlas.git"
+Homepage = "https://github.com/MaenExists/TV-Atlas"
+Repository = "https://github.com/MaenExists/TV-Atlas.git"

@@ -83,7 +83,7 @@ mpv --version
 Clone the repository and run the installer:
 
 ```bash
-git clone https://github.com/TV-Atlas/TV-Atlas.git
+git clone https://github.com/MaenExists/TV-Atlas.git
 cd TV-Atlas
 ./install.sh
 ```
@@ -106,7 +106,7 @@ To uninstall:
 You can run the application directly from the repository without system installation:
 
 ```bash
-git clone https://github.com/TV-Atlas/TV-Atlas.git
+git clone https://github.com/MaenExists/TV-Atlas.git
 cd TV-Atlas
 pip install -r requirements.txt
 ./tv-atlas
