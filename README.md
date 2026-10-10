@@ -7,10 +7,11 @@
 [![Python](https://img.shields.io/badge/Python-3.9%2B-00f0ff?logo=python&logoColor=white)](https://python.org)
 [![Qt](https://img.shields.io/badge/Framework-PySide6%20%2F%20Qt6-00ff66?logo=qt&logoColor=white)](https://www.qt.io)
 [![Player](https://img.shields.io/badge/Engine-MPV%20Embedded-00f0ff?logo=mpv&logoColor=white)](https://mpv.io)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20X11%20%2F%20Wayland-00ff66?logo=linux&logoColor=white)](https://kernel.org)
+[![Google TV](https://img.shields.io/badge/Smart%20TV-Google%20TV%20%26%20Android%20TV-00ff66?logo=android&logoColor=white)](TV_SETUP.md)
+[![Cast](https://img.shields.io/badge/Cast-Google%20Cast%20Ready-00f0ff?logo=googlecast&logoColor=white)](TV_SETUP.md)
 [![License](https://img.shields.io/badge/License-MIT-00f0ff)](LICENSE)
 
-*Explore and watch thousands of live, free-to-air television networks across the globe on an interactive 3D earth.*
+*Explore and watch thousands of live, free-to-air television networks across the globe on an interactive 3D earth — on your Desktop and on your Smart TV.*
 
 <br/>
 
@@ -22,7 +23,31 @@
 
 ## 🌐 Overview
 
-**TV Atlas** is a native desktop application that combines an interactive 3D orthographic globe with a hardware-accelerated broadcast video player. Designed with a cyber-terminal aesthetic (electric cyan and matrix phosphor green), it enables users to seamlessly explore global television signals, rotate the Earth with kinetic momentum, click transmitter locations, and stream international television networks directly inside the interface.
+**TV Atlas** is a dual-mode application designed both for power desktop users and for living room **Smart TV / Google TV** viewing. It combines an interactive 3D orthographic globe with a hardware-accelerated broadcast video player, wrapped in a cyber-terminal aesthetic (electric cyan and matrix phosphor green).
+
+Whether you are clicking signals on your desktop or leaning back on your couch with a **Google TV remote**, TV Atlas makes global television effortless to navigate and watch.
+
+---
+
+## 📺 Smart TV & Google TV Experience
+
+TV Atlas is built to be 100% couch-friendly and remote-control ready:
+
+- **🛋️ 10-Foot Leanback TV Mode (`--tv`)**:
+  - Launch with `./tv-atlas --tv` or press `T` / click `[📺 TV]` in the app.
+  - Upscaled 10-foot typography and high-contrast electric cyan focus rings.
+  - Fully navigable with TV remotes, gamepads, or keyboard arrow keys (▲▼◄►, OK/Enter, Back/Esc).
+
+- **📡 Local Web TV Hub & Google Cast (`--web`)**:
+  - Automatically serves a dedicated 10-foot Web TV interface on your local network (e.g. `http://192.168.x.x:8080`).
+  - Open in any Smart TV browser (**TV Bro**, **Downloader**, **JioPages**, **Chrome** on Google TV, Tizen, webOS).
+  - Built-in **Google Cast (Chromecast)** button: cast any stream from your phone or PC directly to your Google TV in 1 tap!
+  - Scan the on-screen QR code from the desktop app's `[📡 CAST]` button for instant TV pairing.
+
+- **📱 Standalone Native Google TV / Android TV App (`android/`)**:
+  - Full Google TV Leanback project with official TV banner, Android TV launcher category, and hardware-accelerated HLS player.
+  - Install directly via the Google TV **Downloader** app or build via Android Studio.
+  - Detailed instructions available in [**TV_SETUP.md**](TV_SETUP.md).
 
 ---
 
@@ -123,16 +148,19 @@ tv-atlas
 
 ---
 
-## ⌨️ Keyboard Shortcuts Reference
+## ⌨️ Controls & TV Remote Shortcuts
 
-| Shortcut | Action |
+| Shortcut / Remote | Action |
 |:---:|:---|
-| <kbd>Space</kbd> | Toggle Play / Pause |
+| <kbd>T</kbd> | Toggle between Desktop and 10-foot TV Leanback Mode |
+| <kbd>▲</kbd> / <kbd>▼</kbd> | Navigate channels in channel list (in TV Mode) |
+| <kbd>Enter</kbd> / <kbd>OK</kbd> | Tune to highlighted channel (in TV Mode) |
+| <kbd>Space</kbd> / <kbd>Play</kbd> | Toggle Play / Pause |
 | <kbd>F</kbd> or <kbd>F11</kbd> | Toggle Fullscreen Cinema Mode |
 | <kbd>M</kbd> | Toggle Mute |
 | <kbd>R</kbd> | Tune to a random broadcast station anywhere on Earth |
 | <kbd>/</kbd> | Focus the search input field (`SCAN>`) |
-| <kbd>Esc</kbd> | Exit fullscreen mode or clear search filter |
+| <kbd>Esc</kbd> / <kbd>Back</kbd> | Exit fullscreen mode, close dialogs, or clear search filter |
 | <kbd>?</kbd> | Toggle the on-screen keyboard shortcuts guide |
 
 ---

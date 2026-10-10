@@ -10,6 +10,7 @@ Rectangle {
   color: "#090a0c"
 
   property bool helpVisible: false
+  property bool tvCastModalVisible: false
   property var geoCountries: []
   property var catalogStations: []
 
@@ -24,6 +25,15 @@ Rectangle {
       console.warn("Error parsing countries JSON:", e)
     }
     globe.stations = backend.worldSignals
+  }
+
+  Connections {
+    target: backend
+    function onSelectedChannelIndexChanged() {
+      if (backend.isTvMode && channelListView) {
+        channelListView.positionViewAtIndex(backend.selectedChannelIndex, ListView.Contain)
+      }
+    }
   }
 
   // Keyboard controls (only active when not typing in search bar)
@@ -46,6 +56,9 @@ Rectangle {
       } else if (event.key === Qt.Key_R) {
         backend.playRandom()
         event.accepted = true
+      } else if (event.key === Qt.Key_T) {
+        backend.toggleTvMode()
+        event.accepted = true
       } else if (event.key === Qt.Key_F || event.key === Qt.Key_F11) {
         backend.toggleFullscreen()
         event.accepted = true
@@ -58,6 +71,8 @@ Rectangle {
       } else if (event.key === Qt.Key_Escape) {
         if (backend.isFullscreen) {
           backend.toggleFullscreen()
+        } else if (mainWindow.tvCastModalVisible) {
+          mainWindow.tvCastModalVisible = false
         } else if (mainWindow.helpVisible) {
           mainWindow.helpVisible = false
         }
@@ -190,6 +205,60 @@ Rectangle {
         }
 
         Item { Layout.fillWidth: true }
+
+        // TV Mode Leanback Toggle Button
+        Rectangle {
+          Layout.preferredWidth: 70
+          Layout.preferredHeight: 30
+          radius: 4
+          color: backend.isTvMode ? "#00f0ff26" : (tvModeMouse.containsMouse ? "#1a222d" : "transparent")
+          border.color: backend.isTvMode ? "#00f0ff" : "#1a2a3a"
+          border.width: 1
+
+          Text {
+            anchors.centerIn: parent
+            text: backend.isTvMode ? "📺 TV:ON" : "📺 TV"
+            color: backend.isTvMode ? "#00f0ff" : "#9099a3"
+            font.pixelSize: 10
+            font.bold: true
+            font.family: "monospace"
+          }
+
+          MouseArea {
+            id: tvModeMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: backend.toggleTvMode()
+          }
+        }
+
+        // Smart TV / Google TV Cast & Pairing Button
+        Rectangle {
+          Layout.preferredWidth: 74
+          Layout.preferredHeight: 30
+          radius: 4
+          color: mainWindow.tvCastModalVisible ? "#00ff6626" : (castMouse.containsMouse ? "#1a222d" : "transparent")
+          border.color: mainWindow.tvCastModalVisible ? "#00ff66" : "#1a2a3a"
+          border.width: 1
+
+          Text {
+            anchors.centerIn: parent
+            text: "📡 CAST"
+            color: mainWindow.tvCastModalVisible ? "#00ff66" : "#9099a3"
+            font.pixelSize: 10
+            font.bold: true
+            font.family: "monospace"
+          }
+
+          MouseArea {
+            id: castMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: mainWindow.tvCastModalVisible = !mainWindow.tvCastModalVisible
+          }
+        }
 
         // Shuffle / Random Tune Button
         Rectangle {
@@ -499,19 +568,22 @@ Rectangle {
               delegate: Rectangle {
                 id: rowDelegate
                 width: channelListView.width
-                height: 56
-                color: isCurrent ? "#051824" : (rowMouse.containsMouse ? "#06131c" : "transparent")
+                height: backend.isTvMode ? 70 : 56
+                color: isSelectedInTv ? "#0c283d" : (isCurrent ? "#051824" : (rowMouse.containsMouse ? "#06131c" : "transparent"))
+                border.color: isSelectedInTv ? "#00f0ff" : "transparent"
+                border.width: isSelectedInTv ? 2 : 0
 
                 readonly property bool isCurrent: backend.currentChannel && backend.currentChannel.url === modelData.url
+                readonly property bool isSelectedInTv: backend.isTvMode && index === backend.selectedChannelIndex
 
                 // Left active electric indicator
                 Rectangle {
                   anchors.left: parent.left
                   anchors.top: parent.top
                   anchors.bottom: parent.bottom
-                  width: 3
-                  color: "#00f0ff"
-                  visible: isCurrent
+                  width: isSelectedInTv ? 5 : 3
+                  color: isSelectedInTv ? "#00ff66" : "#00f0ff"
+                  visible: isCurrent || isSelectedInTv
                 }
 
                 // Station Title
@@ -521,11 +593,11 @@ Rectangle {
                   anchors.right: starArea.left
                   anchors.rightMargin: 10
                   anchors.top: parent.top
-                  anchors.topMargin: 8
+                  anchors.topMargin: backend.isTvMode ? 12 : 8
                   text: modelData.name || "Station"
-                  color: isCurrent ? "#00f0ff" : "#e2e8f0"
-                  font.pixelSize: 13
-                  font.bold: isCurrent
+                  color: isSelectedInTv ? "#ffffff" : (isCurrent ? "#00f0ff" : "#e2e8f0")
+                  font.pixelSize: backend.isTvMode ? 16 : 13
+                  font.bold: isCurrent || isSelectedInTv
                   font.family: "monospace"
                   elide: Text.ElideRight
                 }
@@ -537,11 +609,11 @@ Rectangle {
                   anchors.right: starArea.left
                   anchors.rightMargin: 10
                   anchors.bottom: parent.bottom
-                  anchors.bottomMargin: 8
+                  anchors.bottomMargin: backend.isTvMode ? 12 : 8
                   text: (modelData.country || "GLOBAL") + " // " + (modelData.quality || "HD") + " // " + (modelData.category || "General")
-                  color: isCurrent ? "#00ff66" : "#2d5a52"
-                  font.pixelSize: 10
-                  font.bold: isCurrent
+                  color: isSelectedInTv ? "#00ff66" : (isCurrent ? "#00ff66" : "#2d5a52")
+                  font.pixelSize: backend.isTvMode ? 12 : 10
+                  font.bold: isCurrent || isSelectedInTv
                   font.family: "monospace"
                   elide: Text.ElideRight
                 }
@@ -559,7 +631,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: backend.isFavorite(modelData.url || modelData.id || "") ? "★" : "☆"
                     color: backend.isFavorite(modelData.url || modelData.id || "") ? "#00ff66" : "#2a4254"
-                    font.pixelSize: 16
+                    font.pixelSize: backend.isTvMode ? 18 : 16
                     font.family: "monospace"
                   }
 
@@ -581,6 +653,7 @@ Rectangle {
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
+                    backend.setSelectedChannelIndex(index)
                     backend.playChannel(modelData)
                     globe.selectedStation = modelData
                   }
@@ -1054,6 +1127,227 @@ Rectangle {
           anchors.fill: parent
           cursorShape: Qt.PointingHandCursor
           onClicked: mainWindow.helpVisible = false
+        }
+      }
+    }
+  }
+
+  // ================= SMART TV & GOOGLE TV CAST MODAL =================
+  Rectangle {
+    id: tvCastOverlay
+    anchors.fill: parent
+    color: "#070a0eed"
+    visible: mainWindow.tvCastModalVisible
+    z: 20
+
+    Rectangle {
+      anchors.centerIn: parent
+      width: Math.min(540, parent.width - 32)
+      height: Math.min(460, parent.height - 32)
+      color: "#0c131a"
+      border.color: "#00f0ff"
+      border.width: 1
+      radius: 8
+
+      ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 20
+        spacing: 12
+
+        // Header
+        RowLayout {
+          Layout.fillWidth: true
+          Text {
+            text: "📺 SMART TV & GOOGLE TV CAST HUB"
+            color: "#00f0ff"
+            font.pixelSize: 14
+            font.bold: true
+            font.family: "monospace"
+            font.letterSpacing: 1
+          }
+          Item { Layout.fillWidth: true }
+          Text {
+            text: "✕"
+            color: "#94a3b8"
+            font.pixelSize: 14
+            font.bold: true
+            font.family: "monospace"
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: mainWindow.tvCastModalVisible = false
+            }
+          }
+        }
+
+        // Subtitle
+        Text {
+          text: "// STREAM & CONTROL LIVE TV FROM YOUR LIVING ROOM COUCH"
+          color: "#00ff66"
+          font.pixelSize: 10
+          font.bold: true
+          font.family: "monospace"
+        }
+
+        // LAN URL Badge
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: 36
+          color: "#040b12"
+          border.color: "#00f0ff66"
+          border.width: 1
+          radius: 4
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            Text {
+              text: "TV ADDRESS:"
+              color: "#64748b"
+              font.pixelSize: 11
+              font.bold: true
+              font.family: "monospace"
+            }
+            Text {
+              text: backend.webServerUrl || "http://127.0.0.1:8080"
+              color: "#00f0ff"
+              font.pixelSize: 13
+              font.bold: true
+              font.family: "monospace"
+            }
+            Item { Layout.fillWidth: true }
+            Text {
+              text: "ONLINE ●"
+              color: "#00ff66"
+              font.pixelSize: 10
+              font.bold: true
+              font.family: "monospace"
+            }
+          }
+        }
+
+        // QR Code & Instructions Split
+        RowLayout {
+          Layout.fillWidth: true
+          Layout.fillHeight: true
+          spacing: 16
+
+          // Left: QR Code Preview
+          Rectangle {
+            Layout.preferredWidth: 140
+            Layout.preferredHeight: 140
+            color: "#ffffff"
+            radius: 6
+
+            Image {
+              anchors.fill: parent
+              anchors.margins: 6
+              source: backend.webServerUrl ? (backend.webServerUrl + "/api/qr") : ""
+              fillMode: Image.PreserveAspectFit
+              smooth: true
+            }
+          }
+
+          // Right: 3-Step Instructions
+          Column {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+              text: "1. Open TV Browser"
+              color: "#f1f5f9"
+              font.pixelSize: 11
+              font.bold: true
+              font.family: "monospace"
+            }
+            Text {
+              text: "   (e.g., TV Bro, Downloader, JioPages, Chrome)"
+              color: "#94a3b8"
+              font.pixelSize: 10
+              font.family: "monospace"
+            }
+
+            Text {
+              text: "2. Type TV Address above"
+              color: "#f1f5f9"
+              font.pixelSize: 11
+              font.bold: true
+              font.family: "monospace"
+            }
+            Text {
+              text: "   or scan this QR code with your phone"
+              color: "#94a3b8"
+              font.pixelSize: 10
+              font.family: "monospace"
+            }
+
+            Text {
+              text: "3. Leanback Remote Navigation"
+              color: "#00ff66"
+              font.pixelSize: 11
+              font.bold: true
+              font.family: "monospace"
+            }
+            Text {
+              text: "   Use ▲▼◄► and OK on your remote to tune!"
+              color: "#94a3b8"
+              font.pixelSize: 10
+              font.family: "monospace"
+            }
+          }
+        }
+
+        // Action Buttons Row
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: 10
+
+          Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 32
+            color: "#122638"
+            border.color: "#00f0ff"
+            border.width: 1
+            radius: 4
+
+            Text {
+              anchors.centerIn: parent
+              text: "OPEN IN BROWSER"
+              color: "#00f0ff"
+              font.pixelSize: 11
+              font.bold: true
+              font.family: "monospace"
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: Qt.openUrlExternally(backend.webServerUrl)
+            }
+          }
+
+          Rectangle {
+            Layout.preferredWidth: 100
+            Layout.preferredHeight: 32
+            color: "#1a222d"
+            radius: 4
+
+            Text {
+              anchors.centerIn: parent
+              text: "CLOSE [ESC]"
+              color: "#94a3b8"
+              font.pixelSize: 10
+              font.bold: true
+              font.family: "monospace"
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: mainWindow.tvCastModalVisible = false
+            }
+          }
         }
       }
     }

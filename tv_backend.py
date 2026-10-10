@@ -14,6 +14,8 @@ import subprocess
 import threading
 from pathlib import Path
 
+import web_server
+
 from PySide6.QtCore import QObject, Signal, Slot, Property, QTimer
 
 STATE_DIR = Path.home() / ".local" / "share" / "tv-atlas"
@@ -163,6 +165,9 @@ class TVAtlasBackend(QObject):
     recentChanged = Signal()
     videoVisibilityChanged = Signal(bool)
     fullscreenChanged = Signal(bool)
+    tvModeChanged = Signal(bool)
+    webServerStatusChanged = Signal()
+    selectedChannelIndexChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -188,12 +193,22 @@ class TVAtlasBackend(QObject):
         self._mode = "world"  # "world", "country", "favorites", "recent", "search"
         self._target_wid = None
         self._is_fullscreen = False
+        self._is_tv_mode = False
+        self._selected_channel_index = 0
+        self._web_server = None
 
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
         self._load_state()
         self._load_data()
+
+        # Start local Web TV & Cast Hub on LAN
+        try:
+            self._web_server = web_server.get_web_server(port=8080)
+            self._web_server.start()
+        except Exception as e:
+            print(f"[TVAtlas] Error starting Web TV server: {e}", file=sys.stderr)
 
     def set_target_wid(self, wid):
         self._target_wid = wid
@@ -390,7 +405,77 @@ class TVAtlasBackend(QObject):
     def isFullscreen(self):
         return self._is_fullscreen
 
+    @Property(bool, notify=tvModeChanged)
+    def isTvMode(self):
+        return self._is_tv_mode
+
+    @Property(int, notify=selectedChannelIndexChanged)
+    def selectedChannelIndex(self):
+        return self._selected_channel_index
+
+    @Property(str, notify=webServerStatusChanged)
+    def webServerUrl(self):
+        if self._web_server and self._web_server.is_running:
+            return self._web_server.get_url()
+        return ""
+
+    @Property(str, notify=webServerStatusChanged)
+    def webServerLanIp(self):
+        if self._web_server:
+            return self._web_server.lan_ip
+        return "127.0.0.1"
+
+    @Property(int, notify=webServerStatusChanged)
+    def webServerPort(self):
+        if self._web_server:
+            return self._web_server.port
+        return 8080
+
+    @Property(bool, notify=webServerStatusChanged)
+    def isWebServerRunning(self):
+        return bool(self._web_server and self._web_server.is_running)
+
+    @Property(str, notify=webServerStatusChanged)
+    def webServerQrSvg(self):
+        if self._web_server and self._web_server.is_running:
+            return self._web_server.get_qr_svg()
+        return ""
+
     # ---------------- Public QML Slots ----------------
+
+    @Slot()
+    def toggleTvMode(self):
+        self._is_tv_mode = not self._is_tv_mode
+        self.tvModeChanged.emit(self._is_tv_mode)
+
+    @Slot(bool)
+    def setTvMode(self, val):
+        if self._is_tv_mode != val:
+            self._is_tv_mode = val
+            self.tvModeChanged.emit(self._is_tv_mode)
+
+    @Slot(int)
+    def setSelectedChannelIndex(self, idx):
+        if self._display_channels:
+            self._selected_channel_index = max(0, min(len(self._display_channels) - 1, idx))
+            self.selectedChannelIndexChanged.emit()
+
+    @Slot()
+    def selectNextChannel(self):
+        if self._display_channels:
+            self._selected_channel_index = (self._selected_channel_index + 1) % len(self._display_channels)
+            self.selectedChannelIndexChanged.emit()
+
+    @Slot()
+    def selectPreviousChannel(self):
+        if self._display_channels:
+            self._selected_channel_index = (self._selected_channel_index - 1 + len(self._display_channels)) % len(self._display_channels)
+            self.selectedChannelIndexChanged.emit()
+
+    @Slot()
+    def playSelectedChannel(self):
+        if self._display_channels and 0 <= self._selected_channel_index < len(self._display_channels):
+            self.playChannel(self._display_channels[self._selected_channel_index])
 
     @Slot()
     def toggleFullscreen(self):
@@ -482,6 +567,7 @@ class TVAtlasBackend(QObject):
         url = channel["url"]
         name = channel.get("name", "TV Station")
         self._current_channel = dict(channel)
+        web_server.TVAtlasWebHandler.current_channel = dict(channel)
         self._is_playing = True
         self._is_paused = False
 
@@ -638,4 +724,9 @@ class TVAtlasBackend(QObject):
         return any(c.get("url") == url for c in self._favorites)
 
     def cleanup(self):
+        if self._web_server:
+            try:
+                self._web_server.stop()
+            except Exception:
+                pass
         self.mpv.stop()

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TV Atlas // Smart TV & Google TV Hub</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- HLS.js for direct hardware-accelerated live stream playback -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <!-- Google Cast Web SDK for direct 1-click casting to Google TV -->
+  <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+</head>
+<body>
+  <div id="app" class="tv-container">
+    
+    <!-- TOP 10-FOOT TV HEADER -->
+    <header class="tv-header">
+      <div class="brand-group">
+        <div class="status-pulse"></div>
+        <span class="brand-title">TV_ATLAS</span>
+        <span class="brand-tag">// GOOGLE_TV</span>
+      </div>
+
+      <!-- Category Filter Pills (D-Pad Navigable) -->
+      <nav class="category-nav" id="categoryNav">
+        <button class="nav-pill active" data-category="all" tabindex="0">WORLD [ALL]</button>
+        <button class="nav-pill" data-category="news" tabindex="0">NEWS</button>
+        <button class="nav-pill" data-category="movies" tabindex="0">MOVIES</button>
+        <button class="nav-pill" data-category="music" tabindex="0">MUSIC</button>
+        <button class="nav-pill" data-category="sports" tabindex="0">SPORTS</button>
+        <button class="nav-pill" data-category="entertainment" tabindex="0">ENTERTAINMENT</button>
+        <button class="nav-pill" data-category="favorites" tabindex="0">★ FAVORITES</button>
+      </nav>
+
+      <!-- TV Search & Remote Helper -->
+      <div class="header-right">
+        <div class="search-box">
+          <span class="search-prompt">SCAN></span>
+          <input type="text" id="searchInput" class="search-input" placeholder="Search 15,444 channels..." tabindex="0" />
+          <button id="searchClear" class="btn-clear" tabindex="0" style="display:none;">✕</button>
+        </div>
+        <button id="btnCast" class="btn-cast" title="Cast to Google TV" tabindex="0">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </button>
+        <button id="btnHelp" class="btn-help" title="Remote Control Guide" tabindex="0">?</button>
+      </div>
+    </header>
+
+    <!-- MAIN TV SPLIT: VIDEO HERO ON LEFT/TOP, CHANNELS ON RIGHT/BOTTOM -->
+    <main class="tv-body">
+      
+      <!-- HERO PLAYER SECTION -->
+      <section class="player-section" id="playerSection">
+        <div class="video-wrapper" id="videoWrapper" tabindex="0">
+          <video id="videoPlayer" class="video-element" playsinline></video>
+          
+          <!-- Idle / Standby Overlay -->
+          <div class="player-overlay" id="playerOverlay">
+            <div class="radar-scan"></div>
+            <div class="standby-info">
+              <div class="glitch-logo">TV_ATLAS // DECODER</div>
+              <p class="standby-sub">SELECT ANY STATION BELOW OR PRESS [OK] ON REMOTE</p>
+            </div>
+          </div>
+
+          <!-- Live Telemetry Overlay -->
+          <div class="telemetry-bar" id="telemetryBar">
+            <div class="telemetry-left">
+              <span class="live-dot">●</span>
+              <span id="channelNameDisplay" class="stream-name">STANDBY</span>
+              <span id="channelMetaDisplay" class="stream-meta">// AWAITING FEED</span>
+            </div>
+            <div class="telemetry-right">
+              <span id="streamResBadge" class="badge-res">HD</span>
+              <span id="streamStatusBadge" class="badge-live">READY</span>
+            </div>
+          </div>
+
+          <!-- Video Controls Overlay -->
+          <div class="video-controls" id="videoControls">
+            <button id="btnPlayPause" class="ctrl-btn" tabindex="0" title="Play/Pause">⏸</button>
+            <button id="btnMute" class="ctrl-btn" tabindex="0" title="Mute/Unmute">🔊</button>
+            <button id="btnNext" class="ctrl-btn" tabindex="0" title="Next Channel">⏭</button>
+            <button id="btnFavCurrent" class="ctrl-btn" tabindex="0" title="Star Channel">☆</button>
+            <div class="ctrl-spacer"></div>
+            <button id="btnFullscreen" class="ctrl-btn" tabindex="0" title="Fullscreen (F)">⛶</button>
+          </div>
+        </div>
+
+        <!-- TV Quick Stats -->
+        <div class="status-strip">
+          <span id="statusStripText" class="status-msg">// 15,444 SATELLITE CHANNELS READY · 10-FOOT LEANBACK UI</span>
+          <span id="stationCountBadge" class="node-count">[0 NODES LOADED]</span>
+        </div>
+      </section>
+
+      <!-- CHANNEL CARDS GRID SECTION -->
+      <section class="channels-section">
+        <div class="channels-header">
+          <h2 id="sectionTitle" class="section-title">FEATURED & VERIFIED BROADCASTS</h2>
+          <span class="remote-tip">Use [▲/▼/◄/►] arrows on remote to browse, [OK] to tune</span>
+        </div>
+
+        <div class="channel-grid" id="channelGrid">
+          <!-- Dynamically populated channel cards -->
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>LOADING SATELLITE DIRECTORY...</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- TV REMOTE CONTROL HELP MODAL -->
+    <div class="remote-modal" id="remoteModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>📺 GOOGLE TV REMOTE CONTROL GUIDE</h3>
+          <button id="btnCloseModal" class="btn-close-modal" tabindex="0">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="key-row">
+            <span class="key-badge">▲ ▼ ◄ ►</span>
+            <span class="key-desc">Navigate channel cards, categories, and controls</span>
+          </div>
+          <div class="key-row">
+            <span class="key-badge">OK / ENTER</span>
+            <span class="key-desc">Tune into selected station & play instantly</span>
+          </div>
+          <div class="key-row">
+            <span class="key-badge">BACK / ESC</span>
+            <span class="key-desc">Exit fullscreen playback back to channel grid</span>
+          </div>
+          <div class="key-row">
+            <span class="key-badge">PLAY / PAUSE</span>
+            <span class="key-desc">Toggle live stream playback</span>
+          </div>
+          <div class="key-row">
+            <span class="key-badge">YELLOW / F</span>
+            <span class="key-desc">Toggle Cinema Fullscreen on your TV</span>
+          </div>
+          <div class="key-row">
+            <span class="key-badge">MOBILE CAST</span>
+            <span class="key-desc">Tap Google Cast icon on phone/PC to beam straight to TV</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <p>TV Hub URL on LAN: <strong id="modalLanUrl">http://127.0.0.1:8080</strong></p>
+          <button id="btnDismissModal" class="btn-dismiss" tabindex="0">GOT IT [PRESS OK]</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

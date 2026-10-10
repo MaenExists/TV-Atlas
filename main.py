@@ -18,11 +18,38 @@ from PySide6.QtQuick import QQuickView
 from PySide6.QtGui import QWindow, QColor, QIcon, QResizeEvent
 from PySide6.QtCore import QUrl, QCoreApplication, Qt, QPointF, QObject, QTimer, QSize, QEvent
 
+import argparse
 from tv_backend import TVAtlasBackend
+import web_server
 
 
 def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    parser = argparse.ArgumentParser(description="TV Atlas - Satellite Live Television Atlas")
+    parser.add_argument("--tv", action="store_true", help="Launch in 10-foot Smart TV Leanback mode with D-Pad navigation")
+    parser.add_argument("--web", "--server", action="store_true", dest="web_mode", help="Start standalone Web TV & Cast Hub on LAN (headless)")
+    parser.add_argument("--port", type=int, default=8080, help="Web TV Hub port (default: 8080)")
+    args, unknown = parser.parse_known_args()
+
+    # Headless Web TV Hub mode
+    if args.web_mode:
+        server = web_server.get_web_server(port=args.port)
+        server.start()
+        print("\n==========================================================")
+        print("📺 TV ATLAS SMART TV & GOOGLE TV WEB HUB")
+        print(f"📡 Open this address in your Google TV / Smart TV browser:")
+        print(f"👉 \033[1;36m{server.get_url()}\033[0m")
+        print("==========================================================\n")
+        print("Listening for Smart TV connections... Press Ctrl+C to terminate.")
+        try:
+            import time
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            server.stop()
+            print("\n[TVAtlas Web] Stopped.")
+            return
 
     QCoreApplication.setOrganizationName("TVAtlas")
     QCoreApplication.setApplicationName("TV-Atlas")
@@ -32,11 +59,16 @@ def main():
 
     # Backend
     backend = TVAtlasBackend(app)
+    if args.tv:
+        backend.setTvMode(True)
 
     # Main QtQuick hardware-rendered view
     view = QQuickView()
-    view.setTitle("TV Atlas")
-    view.resize(980, 660)
+    view.setTitle("TV Atlas" if not args.tv else "TV Atlas // SMART_TV")
+    if args.tv:
+        view.resize(1280, 720)
+    else:
+        view.resize(980, 660)
     view.setMinimumSize(QSize(780, 520))
     view.setColor(QColor("#090a0c"))
     view.setResizeMode(QQuickView.SizeRootObjectToView)
@@ -105,6 +137,9 @@ def main():
                 if k in (Qt.Key_F, Qt.Key_F11):
                     backend.toggleFullscreen()
                     return True
+                elif k == Qt.Key_T:
+                    backend.toggleTvMode()
+                    return True
                 elif k == Qt.Key_Escape:
                     if backend.isFullscreen:
                         backend.setFullscreen(False)
@@ -115,6 +150,16 @@ def main():
                 elif k == Qt.Key_M:
                     backend.toggleMute()
                     return True
+                elif backend.isTvMode:
+                    if k == Qt.Key_Up:
+                        backend.selectPreviousChannel()
+                        return True
+                    elif k == Qt.Key_Down:
+                        backend.selectNextChannel()
+                        return True
+                    elif k in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Select):
+                        backend.playSelectedChannel()
+                        return True
             return False
 
     key_filter = GlobalKeyFilter(app)
