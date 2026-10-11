@@ -24,3 +24,12 @@ dist/
 *.swp
 *.swo
 .DS_Store
+
+# Android build artifacts & caches
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+local.properties
+*.apk
+*.aab
