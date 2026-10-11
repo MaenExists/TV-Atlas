@@ -111,6 +111,28 @@ Item {
       centreLatitude + deltaY * latitudeSensitivity / globeScale, -78, 78)
   }
 
+  function rotateStep(deltaLon, deltaLat) {
+    stopKineticRotation(true)
+    centreLongitude = RadioModel.wrapLongitude(centreLongitude + deltaLon)
+    centreLatitude = RadioModel.clamp(centreLatitude + deltaLat, -78, 78)
+  }
+
+  function zoomStep(factor) {
+    globeScale = Math.max(minimumScale, Math.min(maximumScale, globeScale * factor))
+  }
+
+  function lockNearestStation() {
+    var nearest = RadioModel.nearestVisibleStation(
+      stations, centreLatitude, centreLongitude, "",
+      width, height, globeScale)
+    if (nearest) {
+      selectedStation = nearest
+      stationActivated(nearest)
+      return nearest
+    }
+    return null
+  }
+
   function stationByUuid(uuid) {
     var wanted = String(uuid || "")
     var rows = Array.isArray(stations) ? stations : []

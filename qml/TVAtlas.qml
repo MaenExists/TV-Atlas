@@ -8,11 +8,46 @@ Rectangle {
   width: 940
   height: 640
   color: "#090a0c"
+  focus: true
 
   property bool helpVisible: false
   property bool tvCastModalVisible: false
   property var geoCountries: []
   property var catalogStations: []
+
+  // TV Remote Navigation State Machine
+  property string tvFocusArea: "channels" // "channels", "globe", "tabs", "search"
+  property int tvSelectedTab: 0 // 0: WORLD, 1: FAVORITES, 2: RECENT
+  property bool cinemaOsdVisible: true
+
+  Timer {
+    id: cinemaOsdTimer
+    interval: 3500
+    repeat: false
+    running: backend && backend.isFullscreen && mainWindow.cinemaOsdVisible
+    onTriggered: mainWindow.cinemaOsdVisible = false
+  }
+
+  function wakeCinemaOsd() {
+    mainWindow.cinemaOsdVisible = true
+    if (cinemaOsdTimer.running) {
+      cinemaOsdTimer.restart()
+    } else {
+      cinemaOsdTimer.start()
+    }
+  }
+
+  function activateTvTab(idx) {
+    mainWindow.tvSelectedTab = idx
+    if (idx === 0) {
+      searchField.text = ""
+      backend.showWorld()
+    } else if (idx === 1) {
+      backend.showFavorites()
+    } else if (idx === 2) {
+      backend.showRecent()
+    }
+  }
 
   Component.onCompleted: {
     try {
@@ -25,57 +60,232 @@ Rectangle {
       console.warn("Error parsing countries JSON:", e)
     }
     globe.stations = backend.worldSignals
+    mainWindow.forceActiveFocus()
   }
 
   Connections {
     target: backend
     function onSelectedChannelIndexChanged() {
-      if (backend.isTvMode && channelListView) {
-        channelListView.positionViewAtIndex(backend.selectedChannelIndex, ListView.Contain)
+      if (channelListView) {
+        channelListView.positionViewAtIndex(backend.selectedChannelIndex, ListView.Center)
       }
+    }
+    function onCurrentChannelChanged() {
+      if (channelListView && backend.isTvMode) {
+        channelListView.positionViewAtIndex(backend.selectedChannelIndex, ListView.Center)
+      }
+    }
+    function onTvModeChanged(val) {
+      if (val) {
+        mainWindow.tvFocusArea = "channels"
+      }
+      mainWindow.forceActiveFocus()
+    }
+    function onFullscreenChanged(isFs) {
+      mainWindow.wakeCinemaOsd()
+      mainWindow.forceActiveFocus()
     }
   }
 
-  // Keyboard controls (only active when not typing in search bar)
-  Item {
-    focus: true
-    Keys.onPressed: function(event) {
-      if (searchField.activeFocus) {
-        if (event.key === Qt.Key_Escape) {
-          searchField.text = ""
-          backend.search("")
-          mainWindow.forceActiveFocus()
+  // Keyboard and TV Remote Navigation Controller
+  Keys.onPressed: function(event) {
+    // 0. Fullscreen Cinema Mode Controls
+    if (backend && backend.isFullscreen) {
+      mainWindow.wakeCinemaOsd()
+      if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back || event.key === Qt.Key_F || event.key === Qt.Key_F11) {
+        backend.toggleFullscreen()
+        event.accepted = true
+        return
+      } else if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
+        backend.togglePlayPause()
+        event.accepted = true
+        return
+      } else if (event.key === Qt.Key_Up || event.key === Qt.Key_PageUp) {
+        backend.previousStation()
+        event.accepted = true
+        return
+      } else if (event.key === Qt.Key_Down || event.key === Qt.Key_PageDown) {
+        backend.nextStation()
+        event.accepted = true
+        return
+      } else if (event.key === Qt.Key_Left) {
+        backend.previousStation()
+        event.accepted = true
+        return
+      } else if (event.key === Qt.Key_Right) {
+        backend.nextStation()
+        event.accepted = true
+        return
+      }
+    }
+
+    // 1. Search Field Active Focus Handling
+    if (searchField.activeFocus) {
+      if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
+        searchField.text = ""
+        backend.search("")
+        searchField.focus = false
+        mainWindow.tvFocusArea = "channels"
+        mainWindow.forceActiveFocus()
+        event.accepted = true
+        return
+      } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        searchField.focus = false
+        mainWindow.tvFocusArea = "channels"
+        mainWindow.forceActiveFocus()
+        event.accepted = true
+        return
+      }
+      return
+    }
+
+    // 2. Global Hotkeys
+    if (event.key === Qt.Key_F || event.key === Qt.Key_F11) {
+      backend.toggleFullscreen()
+      mainWindow.wakeCinemaOsd()
+      event.accepted = true
+      return
+    } else if (event.key === Qt.Key_T) {
+      backend.toggleTvMode()
+      event.accepted = true
+      return
+    } else if (event.key === Qt.Key_Space) {
+      backend.togglePlayPause()
+      event.accepted = true
+      return
+    } else if (event.key === Qt.Key_R) {
+      backend.playRandom()
+      event.accepted = true
+      return
+    } else if (event.key === Qt.Key_M) {
+      backend.toggleMute()
+      event.accepted = true
+      return
+    } else if (event.key === Qt.Key_Slash) {
+      mainWindow.tvFocusArea = "search"
+      searchField.forceActiveFocus()
+      event.accepted = true
+      return
+    } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
+      if (mainWindow.tvCastModalVisible) {
+        mainWindow.tvCastModalVisible = false
+        event.accepted = true
+        return
+      } else if (mainWindow.helpVisible) {
+        mainWindow.helpVisible = false
+        event.accepted = true
+        return
+      } else if (mainWindow.tvFocusArea === "globe") {
+        mainWindow.tvFocusArea = "channels"
+        event.accepted = true
+        return
+      } else if (mainWindow.tvFocusArea === "tabs") {
+        mainWindow.tvFocusArea = "channels"
+        event.accepted = true
+        return
+      } else if (searchField.text !== "") {
+        searchField.text = ""
+        backend.search("")
+        event.accepted = true
+        return
+      }
+    }
+
+    // 3. TV Mode D-Pad Remote Navigation State Machine
+    if (backend && backend.isTvMode) {
+      // Area A: Interactive 3D Globe Navigation
+      if (mainWindow.tvFocusArea === "globe") {
+        if (event.key === Qt.Key_Left) {
+          globe.rotateStep(15, 0)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+          globe.rotateStep(-15, 0)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Up) {
+          globe.rotateStep(0, 10)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Down) {
+          globe.rotateStep(0, -10)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal || event.key === Qt.Key_PageUp) {
+          globe.zoomStep(1.25)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Minus || event.key === Qt.Key_PageDown) {
+          globe.zoomStep(0.8)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
+          var locked = globe.lockNearestStation()
+          if (locked) {
+            backend.playChannel(locked)
+          }
+          event.accepted = true
+        } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Back || event.key === Qt.Key_Escape) {
+          mainWindow.tvFocusArea = "channels"
           event.accepted = true
         }
         return
       }
 
-      if (event.key === Qt.Key_Space) {
-        backend.togglePlayPause()
-        event.accepted = true
-      } else if (event.key === Qt.Key_R) {
-        backend.playRandom()
-        event.accepted = true
-      } else if (event.key === Qt.Key_T) {
-        backend.toggleTvMode()
-        event.accepted = true
-      } else if (event.key === Qt.Key_F || event.key === Qt.Key_F11) {
-        backend.toggleFullscreen()
-        event.accepted = true
-      } else if (event.key === Qt.Key_M) {
-        backend.toggleMute()
-        event.accepted = true
-      } else if (event.key === Qt.Key_Slash) {
-        searchField.forceActiveFocus()
-        event.accepted = true
-      } else if (event.key === Qt.Key_Escape) {
-        if (backend.isFullscreen) {
-          backend.toggleFullscreen()
-        } else if (mainWindow.tvCastModalVisible) {
-          mainWindow.tvCastModalVisible = false
-        } else if (mainWindow.helpVisible) {
-          mainWindow.helpVisible = false
+      // Area B: Category Tabs Navigation
+      if (mainWindow.tvFocusArea === "tabs") {
+        if (event.key === Qt.Key_Left) {
+          mainWindow.tvSelectedTab = Math.max(0, mainWindow.tvSelectedTab - 1)
+          mainWindow.activateTvTab(mainWindow.tvSelectedTab)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+          mainWindow.tvSelectedTab = Math.min(2, mainWindow.tvSelectedTab + 1)
+          mainWindow.activateTvTab(mainWindow.tvSelectedTab)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Up) {
+          mainWindow.tvFocusArea = "search"
+          searchField.forceActiveFocus()
+          event.accepted = true
+        } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
+          mainWindow.tvFocusArea = "channels"
+          event.accepted = true
+        } else if (event.key === Qt.Key_Back || event.key === Qt.Key_Escape) {
+          mainWindow.tvFocusArea = "channels"
+          event.accepted = true
         }
+        return
+      }
+
+      // Area C: Channel List (Default)
+      if (event.key === Qt.Key_Down) {
+        backend.selectNextChannel()
+        event.accepted = true
+      } else if (event.key === Qt.Key_Up) {
+        if (backend.selectedChannelIndex === 0) {
+          mainWindow.tvFocusArea = "tabs"
+        } else {
+          backend.selectPreviousChannel()
+        }
+        event.accepted = true
+      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
+        backend.playSelectedChannel()
+        event.accepted = true
+      } else if (event.key === Qt.Key_Left) {
+        mainWindow.tvFocusArea = "globe"
+        event.accepted = true
+      } else if (event.key === Qt.Key_Right) {
+        if (backend.channels && backend.selectedChannelIndex < backend.channels.length) {
+          backend.toggleFavorite(backend.channels[backend.selectedChannelIndex])
+        }
+        event.accepted = true
+      } else if (event.key === Qt.Key_Tab) {
+        mainWindow.tvFocusArea = "globe"
+        event.accepted = true
+      }
+    } else {
+      // Desktop Window Navigation
+      if (event.key === Qt.Key_Down) {
+        backend.selectNextChannel()
+        event.accepted = true
+      } else if (event.key === Qt.Key_Up) {
+        backend.selectPreviousChannel()
+        event.accepted = true
+      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        backend.playSelectedChannel()
         event.accepted = true
       }
     }
@@ -85,6 +295,7 @@ Rectangle {
   ColumnLayout {
     anchors.fill: parent
     spacing: 0
+    visible: backend ? !backend.isFullscreen : true
 
     // ================= TOP HEADER BAR =================
     Rectangle {
@@ -407,6 +618,101 @@ Rectangle {
             }
           }
 
+          // TV Globe Cyber Navigation HUD Pill
+          Rectangle {
+            id: globeTvHud
+            anchors.top: parent.top
+            anchors.topMargin: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            height: 32
+            width: hudRow.implicitWidth + 28
+            radius: 16
+            color: mainWindow.tvFocusArea === "globe" ? "#041424ee" : "#050b12cc"
+            border.color: mainWindow.tvFocusArea === "globe" ? "#00ff66" : "#00f0ff44"
+            border.width: mainWindow.tvFocusArea === "globe" ? 2 : 1
+            visible: backend.isTvMode
+            z: 20
+
+            Row {
+              id: hudRow
+              anchors.centerIn: parent
+              spacing: 10
+
+              Rectangle {
+                width: 6
+                height: 6
+                radius: 3
+                color: mainWindow.tvFocusArea === "globe" ? "#00ff66" : "#00f0ff"
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                text: mainWindow.tvFocusArea === "globe" ? "🌐 GLOBE D-PAD ACTIVE" : "🌐 D-PAD LEFT: CONTROL GLOBE"
+                color: mainWindow.tvFocusArea === "globe" ? "#00ff66" : "#00f0ffaa"
+                font.pixelSize: 10
+                font.bold: true
+                font.family: "monospace"
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                text: "·"
+                color: "#00f0ff44"
+                visible: mainWindow.tvFocusArea === "globe"
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                text: "▲▼◀▶ SPIN | OK LOCK | BACK RETURN"
+                color: "#ffffff"
+                font.pixelSize: 9
+                font.bold: true
+                font.family: "monospace"
+                visible: mainWindow.tvFocusArea === "globe"
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                mainWindow.tvFocusArea = (mainWindow.tvFocusArea === "globe") ? "channels" : "globe"
+              }
+            }
+          }
+
+          // Reticle Crosshairs when Globe has TV Remote Focus
+          Item {
+            anchors.centerIn: parent
+            width: 44
+            height: 44
+            visible: backend.isTvMode && mainWindow.tvFocusArea === "globe"
+            z: 19
+
+            Rectangle {
+              anchors.centerIn: parent
+              width: 32
+              height: 32
+              radius: 16
+              color: "transparent"
+              border.color: "#00f0ffaa"
+              border.width: 1
+            }
+            Rectangle {
+              anchors.centerIn: parent
+              width: 2
+              height: 16
+              color: "#00ff66"
+            }
+            Rectangle {
+              anchors.centerIn: parent
+              width: 16
+              height: 2
+              color: "#00ff66"
+            }
+          }
+
           // Bottom Status Line below the Globe (Hacker Telemetry)
           Item {
             anchors.left: parent.left
@@ -454,7 +760,7 @@ Rectangle {
         // ================= RIGHT: TERMINAL CHANNEL HUB & PLAYER =================
         Item {
           id: sidebar
-          Layout.preferredWidth: Math.min(440, Math.max(340, mainWindow.width * 0.42))
+          Layout.preferredWidth: Math.min(480, Math.max(340, mainWindow.width * (backend.isTvMode ? 0.44 : 0.42)))
           Layout.fillHeight: true
 
           ColumnLayout {
@@ -464,27 +770,40 @@ Rectangle {
             // Navigation Tabs (World, Favorites, Recent)
             Rectangle {
               Layout.fillWidth: true
-              Layout.preferredHeight: 40
+              Layout.preferredHeight: backend.isTvMode ? 44 : 40
               color: "#090a0c"
 
               Row {
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 20
+                spacing: backend.isTvMode ? 10 : 20
 
                 // World Tab
-                Text {
-                  text: "WORLD [ALL_NODES]"
-                  color: backend.mode === "world" || backend.mode === "country" ? "#00f0ff" : "#3b5870"
-                  font.pixelSize: 11
-                  font.bold: true
-                  font.family: "monospace"
+                Rectangle {
+                  height: backend.isTvMode ? 30 : 24
+                  width: worldText.implicitWidth + (backend.isTvMode ? 18 : 8)
+                  radius: 4
+                  color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 0) ? "#0c283d" : "transparent"
+                  border.color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 0) ? "#00f0ff" : "transparent"
+                  border.width: 1
+
+                  Text {
+                    id: worldText
+                    anchors.centerIn: parent
+                    text: backend.isTvMode ? "WORLD [ALL]" : "WORLD [ALL_NODES]"
+                    color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 0) ? "#00f0ff" :
+                           (backend.mode === "world" || backend.mode === "country" ? "#00f0ff" : "#3b5870")
+                    font.pixelSize: backend.isTvMode ? 12 : 11
+                    font.bold: true
+                    font.family: "monospace"
+                  }
 
                   MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
+                      mainWindow.tvSelectedTab = 0
                       searchField.text = ""
                       backend.showWorld()
                     }
@@ -492,32 +811,62 @@ Rectangle {
                 }
 
                 // Favorites Tab
-                Text {
-                  text: "FAVORITES [PINNED]"
-                  color: backend.mode === "favorites" ? "#00ff66" : "#3b5870"
-                  font.pixelSize: 11
-                  font.bold: true
-                  font.family: "monospace"
+                Rectangle {
+                  height: backend.isTvMode ? 30 : 24
+                  width: favText.implicitWidth + (backend.isTvMode ? 18 : 8)
+                  radius: 4
+                  color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 1) ? "#0c283d" : "transparent"
+                  border.color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 1) ? "#00ff66" : "transparent"
+                  border.width: 1
+
+                  Text {
+                    id: favText
+                    anchors.centerIn: parent
+                    text: backend.isTvMode ? "FAVORITES" : "FAVORITES [PINNED]"
+                    color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 1) ? "#00ff66" :
+                           (backend.mode === "favorites" ? "#00ff66" : "#3b5870")
+                    font.pixelSize: backend.isTvMode ? 12 : 11
+                    font.bold: true
+                    font.family: "monospace"
+                  }
 
                   MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: backend.showFavorites()
+                    onClicked: {
+                      mainWindow.tvSelectedTab = 1
+                      backend.showFavorites()
+                    }
                   }
                 }
 
                 // Recent Tab
-                Text {
-                  text: "RECENT [CACHED]"
-                  color: backend.mode === "recent" ? "#00f0ff" : "#3b5870"
-                  font.pixelSize: 11
-                  font.bold: true
-                  font.family: "monospace"
+                Rectangle {
+                  height: backend.isTvMode ? 30 : 24
+                  width: recText.implicitWidth + (backend.isTvMode ? 18 : 8)
+                  radius: 4
+                  color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 2) ? "#0c283d" : "transparent"
+                  border.color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 2) ? "#00f0ff" : "transparent"
+                  border.width: 1
+
+                  Text {
+                    id: recText
+                    anchors.centerIn: parent
+                    text: backend.isTvMode ? "RECENT" : "RECENT [CACHED]"
+                    color: (backend.isTvMode && mainWindow.tvFocusArea === "tabs" && mainWindow.tvSelectedTab === 2) ? "#00f0ff" :
+                           (backend.mode === "recent" ? "#00f0ff" : "#3b5870")
+                    font.pixelSize: backend.isTvMode ? 12 : 11
+                    font.bold: true
+                    font.family: "monospace"
+                  }
 
                   MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: backend.showRecent()
+                    onClicked: {
+                      mainWindow.tvSelectedTab = 2
+                      backend.showRecent()
+                    }
                   }
                 }
               }
@@ -1068,6 +1417,48 @@ Rectangle {
         }
       }
     }
+
+    // ================= VERY BOTTOM FOOTER NOTE =================
+    Rectangle {
+      Layout.fillWidth: true
+      Layout.preferredHeight: backend.isTvMode ? 22 : 18
+      color: "#05070a"
+
+      // Hairline accent line
+      Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 1
+        color: "#0d1822"
+      }
+
+      Item {
+        anchors.fill: parent
+        anchors.leftMargin: 16
+        anchors.rightMargin: 16
+
+        Text {
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text: backend.isTvMode ? "// TV_LEANBACK_GRID · D-PAD ACTIVE" : "// SATELLITE_ORBITAL_NET · 15,444 NODES"
+          color: "#22384a"
+          font.pixelSize: backend.isTvMode ? 10 : 9
+          font.family: "monospace"
+        }
+
+        Text {
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          text: "Property of Maen"
+          color: "#00f0ffaa"
+          font.pixelSize: backend.isTvMode ? 10 : 9
+          font.bold: true
+          font.family: "monospace"
+          font.letterSpacing: 1.2
+        }
+      }
+    }
   }
 
   // Help Overlay
@@ -1361,7 +1752,11 @@ Rectangle {
     anchors.right: parent.right
     height: 48
     color: "#05070ae6"
-    visible: backend ? backend.isFullscreen : false
+    visible: backend ? (backend.isFullscreen && mainWindow.cinemaOsdVisible) : false
+    opacity: (backend && backend.isFullscreen && mainWindow.cinemaOsdVisible) ? 1.0 : 0.0
+    Behavior on opacity {
+      NumberAnimation { duration: 250 }
+    }
     z: 100
 
     // Bottom hairline accent
@@ -1375,16 +1770,17 @@ Rectangle {
 
     RowLayout {
       anchors.fill: parent
-      anchors.leftMargin: 20
-      anchors.rightMargin: 20
-      spacing: 16
+      anchors.leftMargin: 16
+      anchors.rightMargin: 16
+      spacing: 14
 
       // Live pulsating dot
       Rectangle {
-        width: 8
-        height: 8
+        Layout.preferredWidth: 8
+        Layout.preferredHeight: 8
         radius: 4
         color: "#00e5ff"
+        Layout.alignment: Qt.AlignVCenter
         SequentialAnimation on opacity {
           loops: Animation.Infinite
           NumberAnimation { from: 0.3; to: 1.0; duration: 750 }
@@ -1392,7 +1788,7 @@ Rectangle {
         }
       }
 
-      // Station name & metadata
+      // Station name & metadata (Takes remaining space and elides cleanly)
       Text {
         text: backend && backend.currentChannel ? (
                 (backend.currentChannel.name || "TV Atlas Cinema") + "  ·  " +
@@ -1400,22 +1796,24 @@ Rectangle {
                 (backend.currentChannel.quality || "HD")
               ) : "TV Atlas Cinema"
         color: "#f3f4f5"
-        font.pixelSize: 14
+        font.pixelSize: 13
         font.bold: true
         font.family: "monospace"
         elide: Text.ElideRight
         Layout.fillWidth: true
+        Layout.minimumWidth: 60
+        Layout.alignment: Qt.AlignVCenter
       }
 
       // Fullscreen Transport controls
       Row {
-        spacing: 16
+        spacing: 12
         Layout.alignment: Qt.AlignVCenter
 
         Text {
           text: "|◀"
           color: "#94a3b8"
-          font.pixelSize: 14
+          font.pixelSize: 13
           font.family: "monospace"
           MouseArea {
             anchors.fill: parent
@@ -1427,7 +1825,7 @@ Rectangle {
         Text {
           text: backend && backend.isPlaying && !backend.isPaused ? "⏸" : "▶"
           color: "#00e5ff"
-          font.pixelSize: 16
+          font.pixelSize: 15
           font.bold: true
           font.family: "monospace"
           MouseArea {
@@ -1440,7 +1838,7 @@ Rectangle {
         Text {
           text: "▶|"
           color: "#94a3b8"
-          font.pixelSize: 14
+          font.pixelSize: 13
           font.family: "monospace"
           MouseArea {
             anchors.fill: parent
@@ -1452,7 +1850,7 @@ Rectangle {
         Text {
           text: "■"
           color: "#94a3b8"
-          font.pixelSize: 14
+          font.pixelSize: 13
           font.family: "monospace"
           MouseArea {
             anchors.fill: parent
@@ -1462,26 +1860,38 @@ Rectangle {
         }
       }
 
+      // Property of Maen note
+      Text {
+        text: "Property of Maen"
+        color: "#00f0ff"
+        font.pixelSize: 11
+        font.bold: true
+        font.family: "monospace"
+        font.letterSpacing: 1.2
+        Layout.alignment: Qt.AlignVCenter
+      }
+
       // Exit Fullscreen Button
       Rectangle {
-        Layout.preferredHeight: 30
-        Layout.preferredWidth: 170
+        Layout.preferredHeight: 28
+        Layout.preferredWidth: 96
         radius: 4
         color: fsExitMouse.containsMouse ? "#00e5ff" : "#111b27"
         border.color: "#00e5ff88"
         border.width: 1
+        Layout.alignment: Qt.AlignVCenter
 
         Row {
           anchors.centerIn: parent
-          spacing: 6
+          spacing: 5
           Text {
             text: "🗕"
             color: fsExitMouse.containsMouse ? "#090a0c" : "#00e5ff"
-            font.pixelSize: 12
+            font.pixelSize: 11
             font.bold: true
           }
           Text {
-            text: "EXIT CINEMA [ESC]"
+            text: "EXIT [ESC]"
             color: fsExitMouse.containsMouse ? "#090a0c" : "#00e5ff"
             font.pixelSize: 10
             font.bold: true
@@ -1498,5 +1908,18 @@ Rectangle {
         }
       }
     }
+  }
+
+  // Hover hot zone to wake cinema OSD on mouse move at top of screen
+  MouseArea {
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 60
+    hoverEnabled: true
+    propagateComposedEvents: true
+    visible: backend ? backend.isFullscreen : false
+    z: 99
+    onPositionChanged: mainWindow.wakeCinemaOsd()
   }
 }

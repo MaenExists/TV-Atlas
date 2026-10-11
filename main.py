@@ -84,7 +84,7 @@ def main():
 
     def sync_video_geometry():
         if backend.isFullscreen:
-            video_win.setGeometry(0, 48, view.width(), view.height() - 48)
+            video_win.setGeometry(0, 0, view.width(), max(10, view.height()))
             return
 
         root = view.rootObject()
@@ -112,7 +112,7 @@ def main():
     def on_fullscreen_changed(is_fs):
         if is_fs:
             view.showFullScreen()
-            QTimer.singleShot(150, lambda: video_win.setGeometry(0, 48, view.width(), max(10, view.height() - 48)))
+            QTimer.singleShot(150, lambda: video_win.setGeometry(0, 0, view.width(), max(10, view.height())))
         else:
             view.showNormal()
             QTimer.singleShot(150, sync_video_geometry)
@@ -122,44 +122,53 @@ def main():
     class GlobalKeyFilter(QObject):
         def eventFilter(self, watched, event):
             if event.type() == QEvent.KeyPress:
-                # Do not intercept shortcuts while the user is typing in the search input
+                # Do not intercept shortcuts while typing in search input
                 focus_item = view.activeFocusItem()
                 if focus_item is not None:
                     cls = focus_item.metaObject().className()
                     if "Text" in cls or "Edit" in cls:
-                        if event.key() == Qt.Key_Escape:
+                        if event.key() in (Qt.Key_Escape, Qt.Key_Back):
                             if backend.isFullscreen:
                                 backend.setFullscreen(False)
                                 return True
                         return False
 
                 k = event.key()
+                # Fullscreen cinema remote control handling
+                if backend.isFullscreen:
+                    if k in (Qt.Key_Escape, Qt.Key_Back, Qt.Key_F, Qt.Key_F11):
+                        backend.setFullscreen(False)
+                        return True
+                    elif k in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Select, Qt.Key_Space):
+                        backend.togglePlayPause()
+                        return True
+                    elif k in (Qt.Key_Up, Qt.Key_PageUp):
+                        backend.previousStation()
+                        return True
+                    elif k in (Qt.Key_Down, Qt.Key_PageDown):
+                        backend.nextStation()
+                        return True
+                    elif k == Qt.Key_M:
+                        backend.toggleMute()
+                        return True
+                    return False
+
+                # App-level shortcuts (Let contextual D-pad keys pass through to QML Keys.onPressed)
                 if k in (Qt.Key_F, Qt.Key_F11):
                     backend.toggleFullscreen()
                     return True
                 elif k == Qt.Key_T:
                     backend.toggleTvMode()
                     return True
-                elif k == Qt.Key_Escape:
-                    if backend.isFullscreen:
-                        backend.setFullscreen(False)
-                        return True
-                elif k == Qt.Key_Space:
-                    backend.togglePlayPause()
-                    return True
                 elif k == Qt.Key_M:
                     backend.toggleMute()
                     return True
-                elif backend.isTvMode:
-                    if k == Qt.Key_Up:
-                        backend.selectPreviousChannel()
-                        return True
-                    elif k == Qt.Key_Down:
-                        backend.selectNextChannel()
-                        return True
-                    elif k in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Select):
-                        backend.playSelectedChannel()
-                        return True
+                elif k == Qt.Key_Space:
+                    backend.togglePlayPause()
+                    return True
+                elif k == Qt.Key_R:
+                    backend.playRandom()
+                    return True
             return False
 
     key_filter = GlobalKeyFilter(app)

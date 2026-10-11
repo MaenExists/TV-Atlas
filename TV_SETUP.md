@@ -124,3 +124,12 @@ If you have your laptop, mini-PC, or HTPC hooked up to your Smart TV via an HDMI
   Open TV Atlas on your computer and click the `[📡 CAST]` button in the top bar. The exact URL and a scannable QR code are displayed directly on your screen.
 - **"Can I run the TV server on my Linux PC in the background 24/7?"**:
   Yes! Just run `./tv-atlas --web` (or create a systemd service). It uses less than 15MB of RAM in headless mode.
+
+---
+
+<div align="center">
+
+`Property of Maen`
+
+</div>
+

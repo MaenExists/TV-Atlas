@@ -184,3 +184,12 @@ TV Atlas is an open-source media directory and tuning player. It does not broadc
 ## 📄 License
 
 This project is licensed under the terms of the [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+`Property of Maen`
+
+</div>
+

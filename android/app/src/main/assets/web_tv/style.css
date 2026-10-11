@@ -674,3 +674,30 @@ button, input, .channel-card, .video-wrapper, [tabindex="0"] {
   font-weight: bold;
   cursor: pointer;
 }
+
+/* VERY BOTTOM FOOTER NOTE */
+.tv-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 8px 4px 8px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 14px;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: #3b5870;
+}
+
+.footer-tag {
+  color: #234057;
+  font-family: var(--font-mono);
+}
+
+.property-note {
+  color: var(--cyan-primary);
+  opacity: 0.75;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  font-family: var(--font-mono);
+}
+

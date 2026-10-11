@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">TV Atlas</string>
     <string name="app_tagline">Live Worldwide Television Satellite Atlas</string>
+    <string name="property_note">Property of Maen</string>
 </resources>
