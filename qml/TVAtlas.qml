@@ -1454,7 +1454,7 @@ Rectangle {
           color: "#00f0ffaa"
           font.pixelSize: backend.isTvMode ? 10 : 9
           font.bold: true
-          font.family: "monospace"
+          font.family: "JetBrainsMono Nerd Font, JetBrains Mono, FiraCode Nerd Font, Hack Nerd Font, monospace"
           font.letterSpacing: 1.2
         }
       }
@@ -1866,7 +1866,7 @@ Rectangle {
         color: "#00f0ff"
         font.pixelSize: 11
         font.bold: true
-        font.family: "monospace"
+        font.family: "JetBrainsMono Nerd Font, JetBrains Mono, FiraCode Nerd Font, Hack Nerd Font, monospace"
         font.letterSpacing: 1.2
         Layout.alignment: Qt.AlignVCenter
       }
@@ -1921,5 +1921,20 @@ Rectangle {
     visible: backend ? backend.isFullscreen : false
     z: 99
     onPositionChanged: mainWindow.wakeCinemaOsd()
+  }
+
+  // Cinema Fullscreen Bottom Note
+  Text {
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    anchors.margins: 12
+    text: "Property of Maen"
+    color: "#00f0ff88"
+    font.pixelSize: backend && backend.isTvMode ? 11 : 9
+    font.bold: true
+    font.family: "JetBrainsMono Nerd Font, JetBrains Mono, FiraCode Nerd Font, Hack Nerd Font, monospace"
+    font.letterSpacing: 1.2
+    visible: backend ? backend.isFullscreen : false
+    z: 98
   }
 }
