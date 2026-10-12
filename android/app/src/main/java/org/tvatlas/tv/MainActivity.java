@@ -100,8 +100,24 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Add JS interface for software keyboard if available
+        webView.addJavascriptInterface(new WebAppInterface(), "AndroidBridge");
+
         // Load standalone TV Leanback interface
         webView.loadUrl("file:///android_asset/web_tv/index.html");
+    }
+
+    public class WebAppInterface {
+        @android.webkit.JavascriptInterface
+        public void showKeyboard() {
+            runOnUiThread(() -> {
+                android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(webView, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                }
+            });
+        }
     }
 
     @Override
@@ -116,16 +132,21 @@ public class MainActivity extends Activity {
                 }
             }
 
-            // Send back event to Web TV player
-            webView.evaluateJavascript("if (window.handleRemoteBack) { window.handleRemoteBack(); }", null);
-
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - lastBackPressTime < 2500) {
-                finish();
-            } else {
-                lastBackPressTime = currentTime;
-                Toast.makeText(this, "Press BACK again to exit TV Atlas", Toast.LENGTH_SHORT).show();
-            }
+            // Check if Web TV UI consumed the back event (e.g. closed search modal, help modal, or cinema)
+            webView.evaluateJavascript(
+                "(function() { return (window.handleRemoteBack ? window.handleRemoteBack() : false); })()",
+                value -> {
+                    if ("false".equals(value) || "null".equals(value)) {
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastBackPressTime < 2500) {
+                            finish();
+                        } else {
+                            lastBackPressTime = currentTime;
+                            Toast.makeText(MainActivity.this, "Press BACK again to exit TV Atlas", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }
+            );
             return true;
         }
 

@@ -26,8 +26,17 @@
   // DOM Elements
   const el = {
     categoryNav: document.getElementById('categoryNav'),
+    searchBox: document.getElementById('searchBox'),
     searchInput: document.getElementById('searchInput'),
     searchClear: document.getElementById('searchClear'),
+    searchModal: document.getElementById('searchModal'),
+    searchModalQuery: document.getElementById('searchModalQuery'),
+    searchModalCount: document.getElementById('searchModalCount'),
+    searchQuickTags: document.getElementById('searchQuickTags'),
+    tvKeyboardGrid: document.getElementById('tvKeyboardGrid'),
+    btnSearchDone: document.getElementById('btnSearchDone'),
+    btnSearchClearAll: document.getElementById('btnSearchClearAll'),
+    btnCloseSearchModal: document.getElementById('btnCloseSearchModal'),
     btnCast: document.getElementById('btnCast'),
     btnHelp: document.getElementById('btnHelp'),
     videoWrapper: document.getElementById('videoWrapper'),
@@ -58,6 +67,7 @@
   // ==========================================
   async function init() {
     setupEventListeners();
+    buildTvKeyboard();
     setupRemoteKeyNavigation();
     setupGoogleCast();
 
@@ -95,6 +105,7 @@
 
     // 3. Load Channels Directory
     await loadChannels();
+    setTimeout(focusFirstChannel, 300);
   }
 
   async function loadChannels() {
@@ -317,20 +328,145 @@
   }
 
   // ==========================================
-  // 4. REMOTE CONTROL & D-PAD NAVIGATION
+  // 4. ON-SCREEN TV SEARCH & KEYBOARD ENGINE
+  // ==========================================
+  const TV_KEYBOARD_KEYS = [
+    'A', 'B', 'C', 'D', 'E', 'F', '1', '2', '3',
+    'G', 'H', 'I', 'J', 'K', 'L', '4', '5', '6',
+    'M', 'N', 'O', 'P', 'Q', 'R', '7', '8', '9',
+    'S', 'T', 'U', 'V', 'W', 'X', '0', '-', '.',
+    'Y', 'Z'
+  ];
+
+  function buildTvKeyboard() {
+    if (!el.tvKeyboardGrid) return;
+    el.tvKeyboardGrid.innerHTML = '';
+
+    // Standard alphanumeric keys
+    TV_KEYBOARD_KEYS.forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'tv-key';
+      btn.textContent = k;
+      btn.dataset.key = k;
+      btn.tabIndex = 0;
+      btn.addEventListener('click', () => handleVirtualKeyPress(k));
+      el.tvKeyboardGrid.appendChild(btn);
+    });
+
+    // Space bar
+    const btnSpace = document.createElement('button');
+    btnSpace.className = 'tv-key key-wide';
+    btnSpace.textContent = 'SPACE';
+    btnSpace.dataset.action = 'space';
+    btnSpace.tabIndex = 0;
+    btnSpace.addEventListener('click', () => handleVirtualKeyPress(' '));
+    el.tvKeyboardGrid.appendChild(btnSpace);
+
+    // Backspace / Delete
+    const btnDel = document.createElement('button');
+    btnDel.className = 'tv-key key-wide';
+    btnDel.textContent = '⌫ DEL';
+    btnDel.dataset.action = 'backspace';
+    btnDel.tabIndex = 0;
+    btnDel.addEventListener('click', handleVirtualKeyDelete);
+    el.tvKeyboardGrid.appendChild(btnDel);
+
+    // Clear
+    const btnClr = document.createElement('button');
+    btnClr.className = 'tv-key key-wide';
+    btnClr.textContent = '✕ CLEAR';
+    btnClr.dataset.action = 'clear';
+    btnClr.tabIndex = 0;
+    btnClr.addEventListener('click', handleVirtualKeyClear);
+    el.tvKeyboardGrid.appendChild(btnClr);
+
+    // Quick Filter Tags in Search Modal
+    if (el.searchQuickTags) {
+      el.searchQuickTags.addEventListener('click', (e) => {
+        const tagBtn = e.target.closest('.quick-tag');
+        if (!tagBtn) return;
+        const tag = tagBtn.dataset.tag;
+        if (tag) {
+          state.searchQuery = tag;
+          updateSearchViews();
+          loadChannels();
+        }
+      });
+    }
+
+    if (el.btnSearchDone) {
+      el.btnSearchDone.addEventListener('click', closeSearchModal);
+    }
+    if (el.btnSearchClearAll) {
+      el.btnSearchClearAll.addEventListener('click', handleVirtualKeyClear);
+    }
+    if (el.btnCloseSearchModal) {
+      el.btnCloseSearchModal.addEventListener('click', closeSearchModal);
+    }
+
+    // Search Box Click triggers modal
+    if (el.searchBox) {
+      el.searchBox.addEventListener('click', openSearchModal);
+    }
+  }
+
+  function handleVirtualKeyPress(char) {
+    state.searchQuery = (state.searchQuery || '') + char;
+    updateSearchViews();
+    loadChannels();
+  }
+
+  function handleVirtualKeyDelete() {
+    if (state.searchQuery && state.searchQuery.length > 0) {
+      state.searchQuery = state.searchQuery.slice(0, -1);
+      updateSearchViews();
+      loadChannels();
+    }
+  }
+
+  function handleVirtualKeyClear() {
+    state.searchQuery = '';
+    updateSearchViews();
+    loadChannels();
+  }
+
+  function updateSearchViews() {
+    const q = state.searchQuery || '';
+    if (el.searchInput) el.searchInput.value = q;
+    if (el.searchModalQuery) el.searchModalQuery.textContent = q;
+    if (el.searchClear) el.searchClear.style.display = q ? 'block' : 'none';
+  }
+
+  function openSearchModal() {
+    if (!el.searchModal) return;
+    el.searchModal.style.display = 'flex';
+    updateSearchViews();
+    if (el.searchModalCount) {
+      el.searchModalCount.textContent = `[${state.channels.length} MATCHES]`;
+    }
+    if (window.AndroidBridge && window.AndroidBridge.showKeyboard) {
+      window.AndroidBridge.showKeyboard();
+    }
+    // Try to focus on the first key in the keyboard grid
+    const firstKey = el.tvKeyboardGrid ? el.tvKeyboardGrid.querySelector('.tv-key') : null;
+    if (firstKey) {
+      firstKey.focus();
+    } else if (el.btnSearchDone) {
+      el.btnSearchDone.focus();
+    }
+  }
+
+  function closeSearchModal() {
+    if (!el.searchModal) return;
+    el.searchModal.style.display = 'none';
+    focusFirstChannel();
+  }
+
+  // ==========================================
+  // 5. REMOTE CONTROL & D-PAD NAVIGATION
   // ==========================================
   function setupRemoteKeyNavigation() {
     window.addEventListener('keydown', (e) => {
-      // Don't intercept when user is typing in search input
-      if (document.activeElement === el.searchInput) {
-        if (e.key === 'Escape' || e.keyCode === 27) {
-          el.searchInput.blur();
-          focusFirstChannel();
-          e.preventDefault();
-        }
-        return;
-      }
-
       const key = e.key;
       const code = e.keyCode;
 
@@ -346,9 +482,7 @@
       } 
       // 2. OK / Select Button
       else if (key === 'Enter' || code === 13 || code === 23) {
-        if (document.activeElement && document.activeElement.click) {
-          // Native click triggered
-        }
+        handleRemoteOk(e);
       }
       // 3. Back / Exit Button (Google TV Remote Back, Samsung Tizen 10009, LG 461)
       else if (key === 'Escape' || code === 27 || code === 8 || code === 10009 || code === 461 || code === 10007) {
@@ -370,16 +504,83 @@
         e.preventDefault();
       }
     });
+
+    // Make handleRemoteBack globally accessible for Android TV container
+    window.handleRemoteBack = handleRemoteBack;
+  }
+
+  function handleRemoteOk(e) {
+    const active = document.activeElement;
+    if (!active) return;
+
+    // Search Box activated
+    if (active === el.searchBox || active === el.searchInput) {
+      openSearchModal();
+      e.preventDefault();
+      return;
+    }
+
+    // Trigger click on focused element
+    if (active && active.click) {
+      active.click();
+      e.preventDefault();
+    }
   }
 
   function handleDpadDown(e) {
     const active = document.activeElement;
-    if (active && active.classList.contains('nav-pill')) {
-      // From category pills down to first channel card
+
+    // A. IN SEARCH MODAL
+    if (el.searchModal && el.searchModal.style.display !== 'none') {
+      if (active === el.btnCloseSearchModal) {
+        const firstTag = el.searchQuickTags ? el.searchQuickTags.querySelector('.quick-tag') : null;
+        if (firstTag) firstTag.focus();
+        e.preventDefault();
+        return;
+      }
+      if (active && active.classList.contains('quick-tag')) {
+        const firstKey = el.tvKeyboardGrid ? el.tvKeyboardGrid.querySelector('.tv-key') : null;
+        if (firstKey) firstKey.focus();
+        e.preventDefault();
+        return;
+      }
+      if (active && active.classList.contains('tv-key')) {
+        const keys = Array.from(el.tvKeyboardGrid.querySelectorAll('.tv-key'));
+        const idx = keys.indexOf(active);
+        const nextIdx = idx + 9;
+        if (nextIdx < keys.length) {
+          keys[nextIdx].focus();
+        } else if (el.btnSearchDone) {
+          el.btnSearchDone.focus();
+        }
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // B. ON MAIN SCREEN
+    if (!active || active === document.body) {
       focusFirstChannel();
       e.preventDefault();
-    } else if (active && active.classList.contains('channel-card')) {
-      // Move to next card in grid (grid is multi-column)
+      return;
+    }
+
+    if (active === el.searchBox || active === el.searchInput || active === el.btnHelp || active === el.btnCast) {
+      // Down from header search/help moves to active category pill or first channel
+      const activePill = document.querySelector('.nav-pill.active') || document.querySelector('.nav-pill');
+      if (activePill) {
+        activePill.focus();
+      } else {
+        focusFirstChannel();
+      }
+      e.preventDefault();
+    } else if (active.classList.contains('nav-pill')) {
+      // Down from category pills moves to first channel card
+      focusFirstChannel();
+      e.preventDefault();
+    } else if (active.classList.contains('channel-card')) {
+      // Down in channel grid
       const cards = Array.from(document.querySelectorAll('.channel-card'));
       const idx = cards.indexOf(active);
       const cols = getGridColumnCount();
@@ -394,7 +595,44 @@
 
   function handleDpadUp(e) {
     const active = document.activeElement;
-    if (active && active.classList.contains('channel-card')) {
+
+    // A. IN SEARCH MODAL
+    if (el.searchModal && el.searchModal.style.display !== 'none') {
+      if (active === el.btnSearchDone || active === el.btnSearchClearAll) {
+        const keys = Array.from(el.tvKeyboardGrid.querySelectorAll('.tv-key'));
+        if (keys.length) keys[keys.length - 1].focus();
+        e.preventDefault();
+        return;
+      }
+      if (active && active.classList.contains('tv-key')) {
+        const keys = Array.from(el.tvKeyboardGrid.querySelectorAll('.tv-key'));
+        const idx = keys.indexOf(active);
+        const prevIdx = idx - 9;
+        if (prevIdx >= 0) {
+          keys[prevIdx].focus();
+        } else {
+          const firstTag = el.searchQuickTags ? el.searchQuickTags.querySelector('.quick-tag') : null;
+          if (firstTag) firstTag.focus();
+        }
+        e.preventDefault();
+        return;
+      }
+      if (active && active.classList.contains('quick-tag')) {
+        if (el.btnCloseSearchModal) el.btnCloseSearchModal.focus();
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // B. ON MAIN SCREEN
+    if (!active || active === document.body) {
+      focusFirstChannel();
+      e.preventDefault();
+      return;
+    }
+
+    if (active.classList.contains('channel-card')) {
       const cards = Array.from(document.querySelectorAll('.channel-card'));
       const idx = cards.indexOf(active);
       const cols = getGridColumnCount();
@@ -404,9 +642,15 @@
         cards[prevIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         e.preventDefault();
       } else {
-        // Move focus up to active category pill
+        // Top row of channels -> Move up to active category pill
         const activePill = document.querySelector('.nav-pill.active') || document.querySelector('.nav-pill');
         if (activePill) activePill.focus();
+        e.preventDefault();
+      }
+    } else if (active.classList.contains('nav-pill')) {
+      // From Category Pills up -> Move to Search Box!
+      if (el.searchBox) {
+        el.searchBox.focus();
         e.preventDefault();
       }
     }
@@ -414,17 +658,65 @@
 
   function handleDpadRight(e) {
     const active = document.activeElement;
-    if (active && active.classList.contains('nav-pill')) {
+
+    // A. IN SEARCH MODAL
+    if (el.searchModal && el.searchModal.style.display !== 'none') {
+      if (active && active.classList.contains('tv-key')) {
+        const keys = Array.from(el.tvKeyboardGrid.querySelectorAll('.tv-key'));
+        const idx = keys.indexOf(active);
+        if (idx < keys.length - 1) {
+          keys[idx + 1].focus();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (active && active.classList.contains('quick-tag')) {
+        const nextTag = active.nextElementSibling;
+        if (nextTag && nextTag.classList.contains('quick-tag')) {
+          nextTag.focus();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (active === el.btnSearchDone && el.btnSearchClearAll) {
+        el.btnSearchClearAll.focus();
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // B. ON MAIN SCREEN
+    if (!active || active === document.body) {
+      focusFirstChannel();
+      e.preventDefault();
+      return;
+    }
+
+    if (active.classList.contains('nav-pill')) {
       const nextPill = active.nextElementSibling;
       if (nextPill && nextPill.classList.contains('nav-pill')) {
         nextPill.focus();
         e.preventDefault();
+      } else {
+        // Reached end of category pills -> Move to Search Box!
+        if (el.searchBox) {
+          el.searchBox.focus();
+          e.preventDefault();
+        }
       }
-    } else if (active && active.classList.contains('channel-card')) {
-      const nextCard = active.nextElementSibling;
-      if (nextCard && nextCard.classList.contains('channel-card')) {
-        nextCard.focus();
-        nextCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else if (active === el.searchBox || active === el.searchInput) {
+      // From searchBox -> move to Cast or Help button
+      if (el.btnHelp) {
+        el.btnHelp.focus();
+        e.preventDefault();
+      }
+    } else if (active.classList.contains('channel-card')) {
+      const cards = Array.from(document.querySelectorAll('.channel-card'));
+      const idx = cards.indexOf(active);
+      if (idx < cards.length - 1) {
+        cards[idx + 1].focus();
+        cards[idx + 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         e.preventDefault();
       }
     }
@@ -432,34 +724,89 @@
 
   function handleDpadLeft(e) {
     const active = document.activeElement;
-    if (active && active.classList.contains('nav-pill')) {
+
+    // A. IN SEARCH MODAL
+    if (el.searchModal && el.searchModal.style.display !== 'none') {
+      if (active && active.classList.contains('tv-key')) {
+        const keys = Array.from(el.tvKeyboardGrid.querySelectorAll('.tv-key'));
+        const idx = keys.indexOf(active);
+        if (idx > 0) {
+          keys[idx - 1].focus();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (active && active.classList.contains('quick-tag')) {
+        const prevTag = active.previousElementSibling;
+        if (prevTag && prevTag.classList.contains('quick-tag')) {
+          prevTag.focus();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (active === el.btnSearchClearAll && el.btnSearchDone) {
+        el.btnSearchDone.focus();
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // B. ON MAIN SCREEN
+    if (!active || active === document.body) {
+      focusFirstChannel();
+      e.preventDefault();
+      return;
+    }
+
+    if (active === el.btnHelp || active === el.btnCast) {
+      // From Help/Cast -> move to Search Box
+      if (el.searchBox) {
+        el.searchBox.focus();
+        e.preventDefault();
+      }
+    } else if (active === el.searchBox || active === el.searchInput) {
+      // From Search Box -> move back to the last category pill
+      const pills = Array.from(document.querySelectorAll('.nav-pill'));
+      if (pills.length) {
+        pills[pills.length - 1].focus();
+        e.preventDefault();
+      }
+    } else if (active.classList.contains('nav-pill')) {
       const prevPill = active.previousElementSibling;
       if (prevPill && prevPill.classList.contains('nav-pill')) {
         prevPill.focus();
         e.preventDefault();
       }
-    } else if (active && active.classList.contains('channel-card')) {
-      const prevCard = active.previousElementSibling;
-      if (prevCard && prevCard.classList.contains('channel-card')) {
-        prevCard.focus();
-        prevCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else if (active.classList.contains('channel-card')) {
+      const cards = Array.from(document.querySelectorAll('.channel-card'));
+      const idx = cards.indexOf(active);
+      if (idx > 0) {
+        cards[idx - 1].focus();
+        cards[idx - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         e.preventDefault();
       }
     }
   }
 
   function handleRemoteBack(e) {
-    if (el.remoteModal.style.display !== 'none') {
+    if (el.searchModal && el.searchModal.style.display !== 'none') {
+      closeSearchModal();
+      if (e && e.preventDefault) e.preventDefault();
+      return true;
+    }
+    if (el.remoteModal && el.remoteModal.style.display !== 'none') {
       toggleHelpModal();
-      e.preventDefault();
-      return;
+      if (e && e.preventDefault) e.preventDefault();
+      return true;
     }
     if (state.isFullscreen) {
       toggleFullscreen();
-      e.preventDefault();
-      return;
+      if (e && e.preventDefault) e.preventDefault();
+      return true;
     }
     focusFirstChannel();
+    return false;
   }
 
   function focusFirstChannel() {

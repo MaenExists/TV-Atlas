@@ -34,10 +34,10 @@
 
       <!-- TV Search & Remote Helper -->
       <div class="header-right">
-        <div class="search-box">
+        <div class="search-box" id="searchBox" tabindex="0" role="button" title="Search 15,444 channels (Press OK)">
           <span class="search-prompt">SCAN></span>
-          <input type="text" id="searchInput" class="search-input" placeholder="Search 15,444 channels..." tabindex="0" />
-          <button id="searchClear" class="btn-clear" tabindex="0" style="display:none;">✕</button>
+          <input type="text" id="searchInput" class="search-input" placeholder="Search channels [Press OK]..." tabindex="-1" readonly />
+          <button id="searchClear" class="btn-clear" tabindex="0" style="display:none;" title="Clear search">✕</button>
         </div>
         <button id="btnCast" class="btn-cast" title="Cast to Google TV" tabindex="0">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
@@ -156,6 +156,50 @@
         <div class="modal-footer">
           <p>TV Hub URL on LAN: <strong id="modalLanUrl">http://127.0.0.1:8080</strong></p>
           <button id="btnDismissModal" class="btn-dismiss" tabindex="0">GOT IT [PRESS OK]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TV ON-SCREEN SEARCH & KEYBOARD MODAL -->
+    <div class="search-modal" id="searchModal" style="display: none;">
+      <div class="search-modal-card">
+        <div class="search-modal-header">
+          <div class="search-header-title">
+            <span class="pulse-dot">●</span>
+            <h3>SATELLITE FREQUENCY SCANNER // SEARCH</h3>
+          </div>
+          <button id="btnCloseSearchModal" class="btn-close-modal" tabindex="0">✕</button>
+        </div>
+
+        <!-- Current Query Display -->
+        <div class="search-display-box">
+          <span class="search-prompt-large">SEARCH></span>
+          <span id="searchModalQuery" class="search-modal-query"></span>
+          <span class="search-cursor">_</span>
+          <span id="searchModalCount" class="search-modal-count">[15,444 READY]</span>
+        </div>
+
+        <!-- Quick Filter Tags -->
+        <div class="search-quick-tags" id="searchQuickTags">
+          <button class="quick-tag" data-tag="NEWS" tabindex="0">NEWS</button>
+          <button class="quick-tag" data-tag="MOVIES" tabindex="0">MOVIES</button>
+          <button class="quick-tag" data-tag="SPORTS" tabindex="0">SPORTS</button>
+          <button class="quick-tag" data-tag="MUSIC" tabindex="0">MUSIC</button>
+          <button class="quick-tag" data-tag="USA" tabindex="0">USA</button>
+          <button class="quick-tag" data-tag="UK" tabindex="0">UK</button>
+          <button class="quick-tag" data-tag="INDIA" tabindex="0">INDIA</button>
+          <button class="quick-tag" data-tag="BBC" tabindex="0">BBC</button>
+          <button class="quick-tag" data-tag="CNN" tabindex="0">CNN</button>
+        </div>
+
+        <!-- D-Pad On-Screen Keyboard Grid -->
+        <div class="tv-keyboard-grid" id="tvKeyboardGrid">
+          <!-- Dynamically populated rows A-Z, 0-9, Space, Del, Clear -->
+        </div>
+
+        <div class="search-modal-footer">
+          <button id="btnSearchDone" class="btn-search-done" tabindex="0">✓ VIEW MATCHING CHANNELS [PRESS OK]</button>
+          <button id="btnSearchClearAll" class="btn-search-clear" tabindex="0">✕ CLEAR</button>
         </div>
       </div>
     </div>
