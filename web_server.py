@@ -205,7 +205,20 @@ class TVAtlasWebHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(f"Proxy error: {e}".encode("utf-8"))
                 return
 
-        # 6. Default: Serve static files from assets/web_tv/
+        # 6. Direct APK Download Route (TV / phone wireless installation)
+        if path in ("/TV-Atlas-GoogleTV.apk", "/app.apk", "/download", "/apk"):
+            apk_path = BASE_DIR / "android" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
+            if apk_path.exists():
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.android.package-archive")
+                self.send_header("Content-Disposition", 'attachment; filename="TV-Atlas-GoogleTV.apk"')
+                self.send_header("Content-Length", str(apk_path.stat().st_size))
+                self.end_headers()
+                with open(apk_path, "rb") as f:
+                    self.copyfile(f, self.wfile)
+                return
+
+        # 7. Default: Serve static files from assets/web_tv/
         return super().do_GET()
 
 
